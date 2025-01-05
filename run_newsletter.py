@@ -2,12 +2,33 @@ from newsletter_generator import NewsletterGenerator
 import schedule
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
+import requests
 
 # Setup logging for Heroku
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('NewsletterService')
+
+class HealthCheck:
+    def __init__(self):
+        self.last_success = None
+        self.failures = 0
+        
+    def record_success(self):
+        self.last_success = datetime.now()
+        self.failures = 0
+        
+    def record_failure(self):
+        self.failures += 1
+        if self.failures >= 3:
+            self.alert_admin()
+    
+    def alert_admin(self):
+        # Send alert via email or other notification service
+        pass
+
+health = HealthCheck()
 
 def send_daily_newsletter():
     try:
@@ -15,8 +36,10 @@ def send_daily_newsletter():
         newsletter = NewsletterGenerator()
         newsletter.send_newsletter()
         logger.info("Newsletter sent successfully")
+        health.record_success()
     except Exception as e:
         logger.error(f"Failed to send newsletter: {str(e)}")
+        health.record_failure()
 
 def main():
     # Schedule the newsletter (using UTC time - adjust as needed)

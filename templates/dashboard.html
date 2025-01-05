@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Newsletter System Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Newsletter System Status</h1>
+        
+        <!-- Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">System Status</h2>
+                <div id="systemStatus" class="text-2xl font-bold">
+                    {% if newsletter_stats.status == 'healthy' %}
+                        <span class="text-green-500">●</span> Operational
+                    {% else %}
+                        <span class="text-red-500">●</span> Issues Detected
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Last Successful Run</h2>
+                <div id="lastSuccess" class="text-2xl">
+                    {{ newsletter_stats.last_success.strftime('%Y-%m-%d %H:%M:%S') if newsletter_stats.last_success else 'No data' }}
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Recent Failures</h2>
+                <div id="failures" class="text-2xl {% if newsletter_stats.failures > 0 %}text-red-500{% endif %}">
+                    {{ newsletter_stats.failures }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Resources -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">CPU Usage</h2>
+                <canvas id="cpuChart"></canvas>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Memory Usage</h2>
+                <canvas id="memoryChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Recent Activity Log -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">Recent Activity</h2>
+            <div id="activityLog" class="h-64 overflow-y-auto">
+                <!-- Activity log entries will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize charts
+        const cpuChart = new Chart(document.getElementById('cpuChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage %',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            }
+        });
+
+        const memoryChart = new Chart(document.getElementById('memoryChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Memory Usage %',
+                    data: [],
+                    borderColor: 'rgb(153, 102, 255)',
+                    tension: 0.1
+                }]
+            }
+        });
+
+        // Update dashboard data
+        function updateDashboard() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update status indicators
+                    document.getElementById('systemStatus').innerHTML = 
+                        data.newsletter.status === 'healthy' 
+                            ? '<span class="text-green-500">●</span> Operational'
+                            : '<span class="text-red-500">●</span> Issues Detected';
+                    
+                    document.getElementById('lastSuccess').textContent = 
+                        new Date(data.newsletter.last_success).toLocaleString();
+                    
+                    document.getElementById('failures').textContent = 
+                        data.newsletter.failures;
+
+                    // Update charts
+                    const timestamp = new Date().toLocaleTimeString();
+                    
+                    cpuChart.data.labels.push(timestamp);
+                    cpuChart.data.datasets[0].data.push(data.system.cpu_percent);
+                    if (cpuChart.data.labels.length > 20) {
+                        cpuChart.data.labels.shift();
+                        cpuChart.data.datasets[0].data.shift();
+                    }
+                    cpuChart.update();
+
+                    memoryChart.data.labels.push(timestamp);
+                    memoryChart.data.datasets[0].data.push(data.system.memory_percent);
+                    if (memoryChart.data.labels.length > 20) {
+                        memoryChart.data.labels.shift();
+                        memoryChart.data.datasets[0].data.shift();
+                    }
+                    memoryChart.update();
+                });
+        }
+
+        // Update every 5 seconds
+        setInterval(updateDashboard, 5000);
+        updateDashboard();  // Initial update
+    </script>
+</body>
+</html> 
